@@ -1,0 +1,70 @@
+name: LLM Gate
+description: >-
+  Fail when the commits in a pull request, merge-queue group, or push carry
+  LLM / AI-assistant attribution: co-author trailers naming an AI, "Generated
+  with" footers, AI session links, or AI bot authors.
+author: CyberPC Angel, LLC
+branding:
+  icon: shield
+  color: red
+
+inputs:
+  base:
+    description: >-
+      Base commit. Commits reachable from head but not from base are checked.
+      Defaults to the pull request base, merge-group base, or the commit before a
+      push (the default branch for a new branch).
+    required: false
+    default: ''
+  head:
+    description: Head commit. Defaults to the pull request head, merge-group head, or pushed commit.
+    required: false
+    default: ''
+  check-identities:
+    description: Also fail when a commit's author or committer is an AI bot (for example a coding agent).
+    required: false
+    default: 'true'
+  check-pr-text:
+    description: >-
+      Also check the pull request title and description, which become the commit
+      message when the repository squash-merges with the PR description. Add the
+      "edited" activity type to your pull_request trigger so edits re-run the check.
+    required: false
+    default: 'true'
+  extra-patterns:
+    description: Extra case-insensitive ERE patterns, one per line; a commit message line matching any of them fails the check.
+    required: false
+    default: ''
+  ignore-patterns:
+    description: Case-insensitive ERE patterns, one per line; a line or identity matching any of them is never flagged.
+    required: false
+    default: ''
+  token:
+    description: Token used to fetch the commits. Only needs contents read access.
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  result:
+    description: '"pass" or "fail".'
+    value: ${{ steps.gate.outputs.result }}
+
+runs:
+  using: composite
+  steps:
+    - id: gate
+      shell: bash
+      env:
+        LLM_GATE_BASE: ${{ inputs.base || github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
+        LLM_GATE_HEAD: ${{ inputs.head || github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.event.after || github.sha }}
+        LLM_GATE_BASE_REF: ${{ github.event.pull_request.base.ref || github.event.repository.default_branch }}
+        LLM_GATE_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        LLM_GATE_PR_NUMBER: ${{ github.event.pull_request.number }}
+        LLM_GATE_PR_TITLE: ${{ github.event.pull_request.title }}
+        LLM_GATE_PR_BODY: ${{ github.event.pull_request.body }}
+        LLM_GATE_CHECK_IDENTITIES: ${{ inputs.check-identities }}
+        LLM_GATE_CHECK_PR_TEXT: ${{ inputs.check-pr-text }}
+        LLM_GATE_EXTRA_PATTERNS: ${{ inputs.extra-patterns }}
+        LLM_GATE_IGNORE_PATTERNS: ${{ inputs.ignore-patterns }}
+        LLM_GATE_TOKEN: ${{ inputs.token }}
+      run: bash "$GITHUB_ACTION_PATH/ci.sh"
